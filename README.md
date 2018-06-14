@@ -1,18 +1,18 @@
 # NATS Latency and Throughput Test Framework
 
-###Install
+### Install
 ```
 go get github.com/nats-io/latency-tests
 ```
 
-###Running a local NATS server.
+### Running a local NATS server.
 
 You do not need a local server to run the test framework. However if you want to do so, the recommended way to install the NATS server is to [download](http://nats.io/download/) one of the pre-built release binaries which are available for OSX, Linux (x86-64/ARM), Windows, and Docker. Instructions for using these binaries are on the [GitHub releases page][github-release].
 
 
 [github-release]: https://github.com/nats-io/gnatsd/releases/
 
-###Running a test.
+### Running a test.
 
 ```
 > go build latency.go
@@ -25,14 +25,14 @@ The test framework will run a test to publish and subscribe to messages. Publish
 
 You are able to specify various options such as message size [-sz], transmit rate [-tr], test time duration [-tt], and output file for plotting with http://hdrhistogram.github.io/HdrHistogram/plotFiles.html.
 
-###Example
+### Example
 ```
 > ./latency -sa tls://demo.nats.io:4443 -sb tls://demo.nats.io:4443 -tr 1000 -tt 5s -sz 512
 ```
 
 This example will connect both connections to a secure demo server, attempting to send at 1000 msgs/sec with each message payload being 512 bytes long. This test duration will be ~5 seconds.
 
-###Output
+### Output
 ```bash
 
 ==============================
