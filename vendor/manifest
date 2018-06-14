@@ -1,0 +1,55 @@
+{
+	"version": 0,
+	"dependencies": [
+		{
+			"importpath": "github.com/codahale/hdrhistogram",
+			"repository": "https://github.com/codahale/hdrhistogram",
+			"vcs": "git",
+			"revision": "3a0bb77429bd3a61596f5e8a3172445844342120",
+			"branch": "master",
+			"notests": true
+		},
+		{
+			"importpath": "github.com/golang/protobuf/proto",
+			"repository": "https://github.com/golang/protobuf",
+			"vcs": "git",
+			"revision": "5831880292e721c76b58a16ecc60adc27d8e6355",
+			"branch": "master",
+			"path": "/proto",
+			"notests": true
+		},
+		{
+			"importpath": "github.com/golang/protobuf/ptypes/any",
+			"repository": "https://github.com/golang/protobuf",
+			"vcs": "git",
+			"revision": "5831880292e721c76b58a16ecc60adc27d8e6355",
+			"branch": "master",
+			"path": "ptypes/any",
+			"notests": true
+		},
+		{
+			"importpath": "github.com/nats-io/go-nats",
+			"repository": "https://github.com/nats-io/go-nats",
+			"vcs": "git",
+			"revision": "4cf007b2f724143321da6c887060853c8a855696",
+			"branch": "master",
+			"notests": true
+		},
+		{
+			"importpath": "github.com/nats-io/nuid",
+			"repository": "https://github.com/nats-io/nuid",
+			"vcs": "git",
+			"revision": "3e58d42c9cfe5cd9429f1a21ad8f35cd859ba829",
+			"branch": "master",
+			"notests": true
+		},
+		{
+			"importpath": "github.com/tylertreat/hdrhistogram-writer",
+			"repository": "https://github.com/tylertreat/hdrhistogram-writer",
+			"vcs": "git",
+			"revision": "73b8d31ba571535864ea87c5c3df0361b90a3350",
+			"branch": "master",
+			"notests": true
+		}
+	]
+}
