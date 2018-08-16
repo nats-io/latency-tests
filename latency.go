@@ -92,6 +92,9 @@ func main() {
 	// Make sure interest is set for subscribe before publish since a different connection.
 	c2.Flush()
 
+	// Allow time for subscription propagation when using clustered servers.
+	time.Sleep(1 * time.Second)
+
 	log.Printf("Message Payload: %v\n", byteSize(MsgSize))
 	log.Printf("Target Duration: %v\n", TestDuration)
 	log.Printf("Target Msgs/Sec: %v\n", TargetPubRate)
