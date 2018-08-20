@@ -131,7 +131,7 @@ func main() {
 	// Make sure interest is set for subscribe before publish since a different connection.
 	c2.Flush()
 
-	// wait for routes to be estabilished so we get every message
+	// wait for routes to be established so we get every message
 	waitForRoute(c1, c2)
 
 	log.Printf("Message Payload: %v\n", byteSize(MsgSize))
