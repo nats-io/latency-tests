@@ -57,15 +57,16 @@ func waitForRoute(pnc, snc *nats.Conn) {
 
 	// Periodically send messages until the test subscription receives
 	// a message.  Allow for two seconds.
-	for i := 0; atomic.LoadInt32(&routed) == 0 && i < 200; i++ {
-		time.Sleep(10 * time.Millisecond)
+	start := time.Now()
+	for atomic.LoadInt32(&routed) == 0 {
+		if time.Since(start) > (time.Second * 2) {
+			log.Fatalf("Couldn't receive end-to-end test message.")
+		}
 		if err = pnc.Publish(subject, nil); err != nil {
 			log.Fatalf("Couldn't publish to test subject %s:  %v", subject, err)
 		}
 		pnc.Flush()
-	}
-	if atomic.LoadInt32(&routed) == 0 {
-		log.Fatalf("Couldn't receive end-to-end test message.")
+		time.Sleep(10 * time.Millisecond)
 	}
 }
 
