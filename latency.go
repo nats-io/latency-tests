@@ -43,37 +43,31 @@ Test Options:
     -sz <int>        Message size in bytes (default: 8)
     -tr <int>        Rate in msgs/sec (default: 1000)
     -tt <string>     Test duration (default: 5s)
-    -hist <file>     Histogram file
+    -hist <file>     Histogram output file
     -secure          Enable TLS without verfication (default: false)
     -tls_ca <string> TLS Certificate CA file
     -tls_key <file>  TLS Private Key
-    -tls_cert <file> TLS Certificate`
+    -tls_cert <file> TLS Certificate
+`
 
 func usage() {
 	log.Fatalf(usageStr + "\n")
 }
 
-// connect creates a connection to a NATS server. TLS options are set as
-// specified by command line pamameters
-func connect(url string) (*nats.Conn, error) {
-	opts := nats.GetDefaultOptions()
+// createOpts creates options to use in a NATS connection. TLS options are set as
+// specified by command line parameters
+func createOpts() []nats.Option {
+	var opts []nats.Option
 	if Secure {
-		if err := nats.Secure()(&opts); err != nil {
-			log.Fatalf("Could not enable secure connection: %v", err)
-		}
+		opts = append(opts, nats.Secure())
 	}
 	if TLSca != "" {
-		if err := nats.RootCAs(TLSca)(&opts); err != nil {
-			log.Fatalf("Could not load CA: %v", err)
-		}
+		opts = append(opts, nats.RootCAs(TLSca))
 	}
 	if TLScert != "" {
-		if err := nats.ClientCert(TLScert, TLSkey)(&opts); err != nil {
-			log.Fatalf("Could not load client certificate: %v", err)
-		}
+		opts = append(opts, nats.ClientCert(TLScert, TLSkey))
 	}
-	opts.Url = url
-	return opts.Connect()
+	return opts
 }
 
 // waitForRoute tests a subscription in the server to ensure subject interest
@@ -135,12 +129,12 @@ func main() {
 		log.Fatalf("Message Payload Size must be at least %d bytes\n", 8)
 	}
 
-	c1, err := connect(ServerA)
+	opts := createOpts()
+	c1, err := nats.Connect(ServerA, opts...)
 	if err != nil {
 		log.Fatalf("Could not connect to ServerA: %v", err)
 	}
-
-	c2, err := connect(ServerB)
+	c2, err := nats.Connect(ServerB, opts...)
 	if err != nil {
 		log.Fatalf("Could not connect to ServerB: %v", err)
 	}
