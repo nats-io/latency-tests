@@ -9,7 +9,9 @@ import (
 	"log"
 	"math"
 	"sort"
+	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/codahale/hdrhistogram"
@@ -28,6 +30,43 @@ var (
 
 func usage() {
 	log.Fatalf("Usage: latency [-sa serverA] [-sb serverB] [-sz msgSize] [-tr msgs/sec] [-tt testTime] [-hist <file>]\n")
+}
+
+// waitForRoute tests a subscription in the server to ensure subject interest
+// has been propagated between servers.  Otherwise, we may miss early messages
+// when testing with clustered servers and the test will hang.
+func waitForRoute(pnc, snc *nats.Conn) {
+
+	// No need to continue if using one server
+	if strings.Compare(pnc.ConnectedServerId(), snc.ConnectedServerId()) == 0 {
+		return
+	}
+
+	// Setup a test subscription to let us know when a message has been received.
+	// Use a new inbox subject as to not skew results
+	var routed int32
+	subject := nats.NewInbox()
+	sub, err := snc.Subscribe(subject, func(msg *nats.Msg) {
+		atomic.AddInt32(&routed, 1)
+	})
+	if err != nil {
+		log.Fatalf("Couldn't subscribe to test subject %s: %v", subject, err)
+	}
+	defer sub.Unsubscribe()
+	snc.Flush()
+
+	// Periodically send messages until the test subscription receives
+	// a message.  Allow for two seconds.
+	start := time.Now()
+	for atomic.LoadInt32(&routed) == 0 {
+		if time.Since(start) > (time.Second * 2) {
+			log.Fatalf("Couldn't receive end-to-end test message.")
+		}
+		if err = pnc.Publish(subject, nil); err != nil {
+			log.Fatalf("Couldn't publish to test subject %s:  %v", subject, err)
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
 }
 
 func main() {
@@ -54,10 +93,10 @@ func main() {
 	}
 	c2, err := nats.Connect(ServerB)
 	if err != nil {
-		log.Fatalf("Could not connect to ServerA: %v", err)
+		log.Fatalf("Could not connect to ServerB: %v", err)
 	}
 
-	// Do some qiuck RTT calculations
+	// Do some quick RTT calculations
 	log.Println("==============================")
 	now := time.Now()
 	c1.Flush()
@@ -91,6 +130,9 @@ func main() {
 	})
 	// Make sure interest is set for subscribe before publish since a different connection.
 	c2.Flush()
+
+	// wait for routes to be established so we get every message
+	waitForRoute(c1, c2)
 
 	log.Printf("Message Payload: %v\n", byteSize(MsgSize))
 	log.Printf("Target Duration: %v\n", TestDuration)
