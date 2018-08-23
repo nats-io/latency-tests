@@ -19,17 +19,61 @@ import (
 	"github.com/tylertreat/hdrhistogram-writer"
 )
 
+// Test Parameters
 var (
-	ServerA, ServerB string
-	TargetPubRate    int
-	MsgSize          int
-	NumPubs          int
-	TestDuration     time.Duration
-	HistFile         string
+	ServerA       string
+	ServerB       string
+	TargetPubRate int
+	MsgSize       int
+	NumPubs       int
+	TestDuration  time.Duration
+	HistFile      string
+	Secure        bool
+	TLSca         string
+	TLSkey        string
+	TLScert       string
 )
 
+var usageStr = `
+Usage: latency-tests [options]
+
+Test Options:
+    -sa <url>        ServerA (Publish) (default: nats://localhost:4222)
+    -sb <url>        ServerB (Subscribe) (default: nats://localhost:4222)
+    -sz <int>        Message size in bytes (default: 8)
+    -tr <int>        Rate in msgs/sec (default: 1000)
+    -tt <string>     Test duration (default: 5s)
+    -hist <file>     Histogram file
+    -secure          Enable TLS without verfication (default: false)
+    -tls_ca <string> TLS Certificate CA file
+    -tls_key <file>  TLS Private Key
+    -tls_cert <file> TLS Certificate`
+
 func usage() {
-	log.Fatalf("Usage: latency [-sa serverA] [-sb serverB] [-sz msgSize] [-tr msgs/sec] [-tt testTime] [-hist <file>]\n")
+	log.Fatalf(usageStr + "\n")
+}
+
+// connect creates a connection to a NATS server. TLS options are set as
+// specified by command line pamameters
+func connect(url string) (*nats.Conn, error) {
+	opts := nats.GetDefaultOptions()
+	if Secure {
+		if err := nats.Secure()(&opts); err != nil {
+			log.Fatalf("Could not enable secure connection: %v", err)
+		}
+	}
+	if TLSca != "" {
+		if err := nats.RootCAs(TLSca)(&opts); err != nil {
+			log.Fatalf("Could not load CA: %v", err)
+		}
+	}
+	if TLScert != "" {
+		if err := nats.ClientCert(TLScert, TLSkey)(&opts); err != nil {
+			log.Fatalf("Could not load client certificate: %v", err)
+		}
+	}
+	opts.Url = url
+	return opts.Connect()
 }
 
 // waitForRoute tests a subscription in the server to ensure subject interest
@@ -76,6 +120,10 @@ func main() {
 	flag.IntVar(&MsgSize, "sz", 8, "Message Payload Size")
 	flag.DurationVar(&TestDuration, "tt", 5, "Target Test Time")
 	flag.StringVar(&HistFile, "hist", "", "Histogram Output")
+	flag.BoolVar(&Secure, "secure", false, "Use a TLS Connection w/o verification")
+	flag.StringVar(&TLSkey, "tls_key", "", "Private key file")
+	flag.StringVar(&TLScert, "tls_cert", "", "Certificate file")
+	flag.StringVar(&TLSca, "tls_ca", "", "Certificate CA file")
 
 	log.SetFlags(0)
 	flag.Usage = usage
@@ -87,11 +135,12 @@ func main() {
 		log.Fatalf("Message Payload Size must be at least %d bytes\n", 8)
 	}
 
-	c1, err := nats.Connect(ServerA)
+	c1, err := connect(ServerA)
 	if err != nil {
 		log.Fatalf("Could not connect to ServerA: %v", err)
 	}
-	c2, err := nats.Connect(ServerB)
+
+	c2, err := connect(ServerB)
 	if err != nil {
 		log.Fatalf("Could not connect to ServerB: %v", err)
 	}
