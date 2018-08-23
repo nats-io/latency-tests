@@ -65,7 +65,6 @@ func waitForRoute(pnc, snc *nats.Conn) {
 		if err = pnc.Publish(subject, nil); err != nil {
 			log.Fatalf("Couldn't publish to test subject %s:  %v", subject, err)
 		}
-		pnc.Flush()
 		time.Sleep(10 * time.Millisecond)
 	}
 }
