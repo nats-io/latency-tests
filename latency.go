@@ -54,22 +54,6 @@ func usage() {
 	log.Fatalf(usageStr + "\n")
 }
 
-// createOpts creates options to use in a NATS connection. TLS options are set as
-// specified by command line parameters
-func createOpts() []nats.Option {
-	var opts []nats.Option
-	if Secure {
-		opts = append(opts, nats.Secure())
-	}
-	if TLSca != "" {
-		opts = append(opts, nats.RootCAs(TLSca))
-	}
-	if TLScert != "" {
-		opts = append(opts, nats.ClientCert(TLScert, TLSkey))
-	}
-	return opts
-}
-
 // waitForRoute tests a subscription in the server to ensure subject interest
 // has been propagated between servers.  Otherwise, we may miss early messages
 // when testing with clustered servers and the test will hang.
@@ -129,7 +113,18 @@ func main() {
 		log.Fatalf("Message Payload Size must be at least %d bytes\n", 8)
 	}
 
-	opts := createOpts()
+	// Setup connection options
+	var opts []nats.Option
+	if Secure {
+		opts = append(opts, nats.Secure())
+	}
+	if TLSca != "" {
+		opts = append(opts, nats.RootCAs(TLSca))
+	}
+	if TLScert != "" {
+		opts = append(opts, nats.ClientCert(TLScert, TLSkey))
+	}
+
 	c1, err := nats.Connect(ServerA, opts...)
 	if err != nil {
 		log.Fatalf("Could not connect to ServerA: %v", err)
