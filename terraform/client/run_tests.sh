@@ -2,7 +2,7 @@
 
 . ./setenv.sh
 
-dur="1s"
+dur="5s"
 tlsvars="--secure -tls_ca ca.pem -tls_cert client.pem -tls_key client-key.pem"
 
 runtest() {
