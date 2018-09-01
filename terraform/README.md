@@ -9,6 +9,8 @@ provision machine instances and run the latency tests.
 The only required tool is *terraform*.  Terraform installation instructions
 can be found [here](https://www.terraform.io/intro/getting-started/install.html).
 
+This has been tested with terraform version 0.11.8.
+
 If you want to regenerate certificates for TLS, optionally you can install CFSSL.  
 See the [TLS](##TLS) section below.
 
@@ -27,7 +29,8 @@ regenerated to replace existing certificates by running the
 ## Test Setup
 
 **First time usage**:  The first time you are running these scripts you will
-want to run the `terraform init` command from the provider's directory.
+need to run the `terraform init` command from the provider's directory.  It is
+recommended to run `terraform init` every time before running `terraform apply`.
 
 Supported cloud providers include:
 
@@ -77,10 +80,12 @@ Adjust configuration files as necessary to mirror your environment.
 
 ## The latency test client
 
-Having the latency client as a single app own instance is the best way to measure
-end to end latency with respect to timing.  As we are in the low microsecond
-range of measurements and measuring tail latency on higher end machines,
-we need to very accurately measure time deltas.  This either requires sophisticated kernal time syncronization or using the same kernel instance to measure time.  In the interest of simplicity and brevity, we chose the latter.
+Having the latency client as a single app own instance is the best way to
+measure end to end latency.  As we are in the low microsecond range of
+measurements and measuring tail latency on higher end machines, we
+very precise time measurements.  This requires sophisticated time
+synchronization or using a single machine instance to measure
+time.  In the interest of simplicity and brevity, we chose the latter.
 
 ## Manually running the tests
 

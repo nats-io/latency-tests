@@ -8,17 +8,15 @@ A prerequisite to running this test on GCP is to setup a GCP account that can ru
 2. Generate an account.json file, as described [here].(https://medium.com/@josephbleroy/using-terraform-with-google-cloud-platform-part-1-n-6b5e4074c059)
 3. Enable the compute engine API and ensure proper permissions are set.
 
-## First time Usage
-
-From this directory, to provision the test instances, simply run the command:
-`$ terraform apply`
-
-This will setup the latency tests described in the higher level terraform [README.md](../readme.md).
-
 ## Setting up and running the test
+
+We recommend always executing `terraform init` before applying the terraform
+configuration.
 
 Once all of the permissions and keys are setup, you can run the test.  From this
 directory, run `terraform apply`.
+
+This will setup the latency tests described in the higher level terraform [README.md](../readme.md).
 
 Next, SSH to the client machine and run tests.  The `run_tests.sh` runs a series of tests and provides a good starting point.
 
