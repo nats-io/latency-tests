@@ -96,7 +96,7 @@ func main() {
 	flag.StringVar(&ServerB, "sb", nats.DefaultURL, "ServerB - Subscriber")
 	flag.IntVar(&TargetPubRate, "tr", 1000, "Target Publish Rate")
 	flag.IntVar(&MsgSize, "sz", 8, "Message Payload Size")
-	flag.DurationVar(&TestDuration, "tt", 5, "Target Test Time")
+	flag.DurationVar(&TestDuration, "tt", 5*time.Second, "Target Test Time")
 	flag.StringVar(&HistFile, "hist", "", "Histogram Output")
 	flag.BoolVar(&Secure, "secure", false, "Use a TLS Connection w/o verification")
 	flag.StringVar(&TLSkey, "tls_key", "", "Private key file")
