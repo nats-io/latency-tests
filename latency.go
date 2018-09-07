@@ -8,6 +8,7 @@ import (
 	"io"
 	"log"
 	"math"
+	"os"
 	"sort"
 	"strings"
 	"sync"
@@ -97,7 +98,7 @@ func main() {
 	flag.IntVar(&TargetPubRate, "tr", 1000, "Target Publish Rate")
 	flag.IntVar(&MsgSize, "sz", 8, "Message Payload Size")
 	flag.DurationVar(&TestDuration, "tt", 5*time.Second, "Target Test Time")
-	flag.StringVar(&HistFile, "hist", "", "Histogram Output")
+	flag.StringVar(&HistFile, "hist", "", "Histogram and Raw Output")
 	flag.BoolVar(&Secure, "secure", false, "Use a TLS Connection w/o verification")
 	flag.StringVar(&TLSkey, "tls_key", "", "Private key file")
 	flag.StringVar(&TLScert, "tls_cert", "", "Certificate file")
@@ -214,11 +215,14 @@ func main() {
 	}
 	pubDur := time.Since(start)
 	wg.Wait()
+	subDur := time.Since(start)
 
-	// Print results
-	log.Printf("Actual Msgs/Sec: %d\n", rps(NumPubs, pubDur))
-	log.Printf("Actual Band/Sec: %v\n", byteSize(rps(NumPubs, pubDur)*MsgSize*2))
-	log.Printf("Actual Duration: %v\n", fmtDur(time.Since(start)))
+	// If we are writing to files, save the original unsorted data
+	if HistFile != "" {
+		if err := writeRawFile(HistFile+".raw", durations); err != nil {
+			log.Printf("Unable to write raw output file: %v", err)
+		}
+	}
 
 	sort.Slice(durations, func(i, j int) bool { return durations[i] < durations[j] })
 
@@ -236,9 +240,17 @@ func main() {
 	log.Println("==============================")
 
 	if HistFile != "" {
-		pctls := histwriter.Percentiles{10, 25, 50, 75, 90, 99, 99.9, 99.99, 99.999}
+		pctls := histwriter.Percentiles{10, 25, 50, 75, 90, 99, 99.9, 99.99, 99.999, 99.9999, 99.99999, 100.0}
 		histwriter.WriteDistributionFile(h, pctls, 1.0/1000000.0, HistFile+".histogram")
 	}
+
+	// Print results
+	log.Printf("Actual Msgs/Sec: %d\n", rps(NumPubs, pubDur))
+	log.Printf("Actual Band/Sec: %v\n", byteSize(rps(NumPubs, pubDur)*MsgSize*2))
+	log.Printf("Minumum Latency: %v", fmtDur(durations[0]))
+	log.Printf("Maximum Latency: %v", fmtDur(durations[len(durations)-1]))
+	log.Printf("Last Sent Wall Time: %v", fmtDur(pubDur))
+	log.Printf("Last Recv Wall Time: %v", fmtDur(subDur))
 }
 
 const fsecs = float64(time.Second)
@@ -274,4 +286,18 @@ func fmtDur(t time.Duration) time.Duration {
 		return t.Truncate(time.Microsecond)
 	}
 	return t.Truncate(time.Millisecond)
+}
+
+// writeRawFile create a file with a list of recorded latency
+// measurements, one per line.
+func writeRawFile(filePath string, values []time.Duration) error {
+	f, err := os.Create(filePath)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	for _, value := range values {
+		fmt.Fprintf(f, "%f\n", float64(value.Nanoseconds())/1000000.0)
+	}
+	return nil
 }
