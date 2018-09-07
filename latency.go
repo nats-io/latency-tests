@@ -288,7 +288,7 @@ func fmtDur(t time.Duration) time.Duration {
 	return t.Truncate(time.Millisecond)
 }
 
-// writeRawFile create a file with a list of recorded latency
+// writeRawFile creates a file with a list of recorded latency
 // measurements, one per line.
 func writeRawFile(filePath string, values []time.Duration) error {
 	f, err := os.Create(filePath)
