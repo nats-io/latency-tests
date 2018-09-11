@@ -8,6 +8,7 @@ import (
 	"io"
 	"log"
 	"math"
+	"os"
 	"sort"
 	"strings"
 	"sync"
@@ -92,12 +93,14 @@ func waitForRoute(pnc, snc *nats.Conn) {
 }
 
 func main() {
+	start := time.Now()
+
 	flag.StringVar(&ServerA, "sa", nats.DefaultURL, "ServerA - Publisher")
 	flag.StringVar(&ServerB, "sb", nats.DefaultURL, "ServerB - Subscriber")
 	flag.IntVar(&TargetPubRate, "tr", 1000, "Target Publish Rate")
 	flag.IntVar(&MsgSize, "sz", 8, "Message Payload Size")
 	flag.DurationVar(&TestDuration, "tt", 5*time.Second, "Target Test Time")
-	flag.StringVar(&HistFile, "hist", "", "Histogram Output")
+	flag.StringVar(&HistFile, "hist", "", "Histogram and Raw Output")
 	flag.BoolVar(&Secure, "secure", false, "Use a TLS Connection w/o verification")
 	flag.StringVar(&TLSkey, "tls_key", "", "Private key file")
 	flag.StringVar(&TLScert, "tls_cert", "", "Certificate file")
@@ -184,11 +187,11 @@ func main() {
 
 	// For publish throttling
 	delay := time.Second / time.Duration(TargetPubRate)
-	start := time.Now()
+	pubStart := time.Now()
 
 	// Throttle logic, crude I know, but works better then time.Ticker.
 	adjustAndSleep := func(count int) {
-		r := rps(count, time.Since(start))
+		r := rps(count, time.Since(pubStart))
 		adj := delay / 20 // 5%
 		if adj == 0 {
 			adj = 1 // 1ns min
@@ -212,13 +215,16 @@ func main() {
 		c1.Publish(subject, data)
 		adjustAndSleep(i + 1)
 	}
-	pubDur := time.Since(start)
+	pubDur := time.Since(pubStart)
 	wg.Wait()
+	subDur := time.Since(pubStart)
 
-	// Print results
-	log.Printf("Actual Msgs/Sec: %d\n", rps(NumPubs, pubDur))
-	log.Printf("Actual Band/Sec: %v\n", byteSize(rps(NumPubs, pubDur)*MsgSize*2))
-	log.Printf("Actual Duration: %v\n", fmtDur(time.Since(start)))
+	// If we are writing to files, save the original unsorted data
+	if HistFile != "" {
+		if err := writeRawFile(HistFile+".raw", durations); err != nil {
+			log.Printf("Unable to write raw output file: %v", err)
+		}
+	}
 
 	sort.Slice(durations, func(i, j int) bool { return durations[i] < durations[j] })
 
@@ -226,19 +232,34 @@ func main() {
 	for _, d := range durations {
 		h.RecordValue(int64(d))
 	}
-	log.Printf("HDR Percentiles:\n10:\t%v\n50:\t%v\n75:\t%v\n90:\t%v\n99:\t%v\n99.99:\t%v\n",
-		fmtDur(time.Duration(h.ValueAtQuantile(10))),
-		fmtDur(time.Duration(h.ValueAtQuantile(50))),
-		fmtDur(time.Duration(h.ValueAtQuantile(75))),
-		fmtDur(time.Duration(h.ValueAtQuantile(90))),
-		fmtDur(time.Duration(h.ValueAtQuantile(99))),
-		fmtDur(time.Duration(h.ValueAtQuantile(99.99))))
+
+	log.Printf("HDR Percentiles:\n")
+	log.Printf("10:       %v\n", fmtDur(time.Duration(h.ValueAtQuantile(10))))
+	log.Printf("50:       %v\n", fmtDur(time.Duration(h.ValueAtQuantile(50))))
+	log.Printf("75:       %v\n", fmtDur(time.Duration(h.ValueAtQuantile(75))))
+	log.Printf("90:       %v\n", fmtDur(time.Duration(h.ValueAtQuantile(90))))
+	log.Printf("99:       %v\n", fmtDur(time.Duration(h.ValueAtQuantile(99))))
+	log.Printf("99.99:    %v\n", fmtDur(time.Duration(h.ValueAtQuantile(99.99))))
+	log.Printf("99.999:   %v\n", fmtDur(time.Duration(h.ValueAtQuantile(99.999))))
+	log.Printf("99.9999:  %v\n", fmtDur(time.Duration(h.ValueAtQuantile(99.9999))))
+	log.Printf("99.99999: %v\n", fmtDur(time.Duration(h.ValueAtQuantile(99.99999))))
+	log.Printf("100:      %v\n", fmtDur(time.Duration(h.ValueAtQuantile(100.0))))
 	log.Println("==============================")
 
 	if HistFile != "" {
-		pctls := histwriter.Percentiles{10, 25, 50, 75, 90, 99, 99.9, 99.99, 99.999}
+		pctls := histwriter.Percentiles{10, 25, 50, 75, 90, 99, 99.9, 99.99, 99.999, 99.9999, 99.99999, 100.0}
 		histwriter.WriteDistributionFile(h, pctls, 1.0/1000000.0, HistFile+".histogram")
 	}
+
+	// Print results
+	log.Printf("Actual Msgs/Sec: %d\n", rps(NumPubs, pubDur))
+	log.Printf("Actual Band/Sec: %v\n", byteSize(rps(NumPubs, pubDur)*MsgSize*2))
+	log.Printf("Minumum Latency: %v", fmtDur(durations[0]))
+	log.Printf("Median Latency : %v", fmtDur(getMedian(durations)))
+	log.Printf("Maximum Latency: %v", fmtDur(durations[len(durations)-1]))
+	log.Printf("1st Sent Wall Time : %v", fmtDur(pubStart.Sub(start)))
+	log.Printf("Last Sent Wall Time: %v", fmtDur(pubDur))
+	log.Printf("Last Recv Wall Time: %v", fmtDur(subDur))
 }
 
 const fsecs = float64(time.Second)
@@ -270,8 +291,31 @@ func logn(n, b float64) float64 {
 
 // Make time durations a bit prettier.
 func fmtDur(t time.Duration) time.Duration {
-	if t > time.Microsecond && t < time.Millisecond {
-		return t.Truncate(time.Microsecond)
+	// e.g 234us, 4.567ms, 1.234567s
+	return t.Truncate(time.Microsecond)
+}
+
+func getMedian(values []time.Duration) time.Duration {
+	l := len(values)
+	if l == 0 {
+		log.Fatalf("empty set")
 	}
-	return t.Truncate(time.Millisecond)
+	if l%2 == 0 {
+		return (values[l/2-1] + values[l/2]) / 2
+	}
+	return values[l/2]
+}
+
+// writeRawFile creates a file with a list of recorded latency
+// measurements, one per line.
+func writeRawFile(filePath string, values []time.Duration) error {
+	f, err := os.Create(filePath)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	for _, value := range values {
+		fmt.Fprintf(f, "%f\n", float64(value.Nanoseconds())/1000000.0)
+	}
+	return nil
 }
