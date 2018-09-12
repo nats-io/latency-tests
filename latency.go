@@ -254,7 +254,7 @@ func main() {
 	// Print results
 	log.Printf("Actual Msgs/Sec: %d\n", rps(NumPubs, pubDur))
 	log.Printf("Actual Band/Sec: %v\n", byteSize(rps(NumPubs, pubDur)*MsgSize*2))
-	log.Printf("Minumum Latency: %v", fmtDur(durations[0]))
+	log.Printf("Minimum Latency: %v", fmtDur(durations[0]))
 	log.Printf("Median Latency : %v", fmtDur(getMedian(durations)))
 	log.Printf("Maximum Latency: %v", fmtDur(durations[len(durations)-1]))
 	log.Printf("1st Sent Wall Time : %v", fmtDur(pubStart.Sub(start)))
