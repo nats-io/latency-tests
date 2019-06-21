@@ -16,7 +16,7 @@ import (
 	"time"
 
 	"github.com/codahale/hdrhistogram"
-	"github.com/nats-io/go-nats"
+	"github.com/nats-io/nats.go"
 	"github.com/tylertreat/hdrhistogram-writer"
 )
 
@@ -33,6 +33,7 @@ var (
 	TLSca         string
 	TLSkey        string
 	TLScert       string
+	UserCreds     string
 )
 
 var usageStr = `
@@ -49,6 +50,7 @@ Test Options:
     -tls_ca <string> TLS Certificate CA file
     -tls_key <file>  TLS Private Key
     -tls_cert <file> TLS Certificate
+    -creds <file>    User Credentials
 `
 
 func usage() {
@@ -105,6 +107,7 @@ func main() {
 	flag.StringVar(&TLSkey, "tls_key", "", "Private key file")
 	flag.StringVar(&TLScert, "tls_cert", "", "Certificate file")
 	flag.StringVar(&TLSca, "tls_ca", "", "Certificate CA file")
+	flag.StringVar(&UserCreds, "creds", "", "User Credentials File")
 
 	log.SetFlags(0)
 	flag.Usage = usage
@@ -126,6 +129,9 @@ func main() {
 	}
 	if TLScert != "" {
 		opts = append(opts, nats.ClientCert(TLScert, TLSkey))
+	}
+	if UserCreds != "" {
+		opts = append(opts, nats.UserCredentials(UserCreds))
 	}
 
 	c1, err := nats.Connect(ServerA, opts...)
