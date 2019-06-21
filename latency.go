@@ -245,6 +245,7 @@ func main() {
 	log.Printf("75:       %v\n", fmtDur(time.Duration(h.ValueAtQuantile(75))))
 	log.Printf("90:       %v\n", fmtDur(time.Duration(h.ValueAtQuantile(90))))
 	log.Printf("99:       %v\n", fmtDur(time.Duration(h.ValueAtQuantile(99))))
+	log.Printf("99.9:     %v\n", fmtDur(time.Duration(h.ValueAtQuantile(99.9))))
 	log.Printf("99.99:    %v\n", fmtDur(time.Duration(h.ValueAtQuantile(99.99))))
 	log.Printf("99.999:   %v\n", fmtDur(time.Duration(h.ValueAtQuantile(99.999))))
 	log.Printf("99.9999:  %v\n", fmtDur(time.Duration(h.ValueAtQuantile(99.9999))))
