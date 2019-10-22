@@ -8,7 +8,7 @@ RUN apk add --update git
 
 COPY . .
 
-RUN CGO_ENABLED=0 go build -v -a -tags netgo -installsuffix netgo -ldflags "-s -w" -o /latency-tests
+RUN CGO_ENABLED=0 GO111MODULE=on go build -v -a -tags netgo -installsuffix netgo -ldflags "-s -w" -o /latency-tests
 
 FROM alpine:3.8
 
