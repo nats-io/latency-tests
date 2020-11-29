@@ -9,6 +9,7 @@ import (
 	"log"
 	"math"
 	"os"
+	"runtime/debug"
 	"sort"
 	"strings"
 	"sync"
@@ -17,7 +18,7 @@ import (
 
 	"github.com/codahale/hdrhistogram"
 	"github.com/nats-io/nats.go"
-	"github.com/tylertreat/hdrhistogram-writer"
+	hw "github.com/tylertreat/hdrhistogram-writer"
 )
 
 // Test Parameters
@@ -113,6 +114,9 @@ func main() {
 	flag.Usage = usage
 	flag.Parse()
 
+	// Slow down GC.
+	debug.SetGCPercent(500)
+
 	NumPubs = int(TestDuration/time.Second) * TargetPubRate
 
 	if MsgSize < 8 {
@@ -138,10 +142,13 @@ func main() {
 	if err != nil {
 		log.Fatalf("Could not connect to ServerA: %v", err)
 	}
+	defer c1.Close()
+
 	c2, err := nats.Connect(ServerB, opts...)
 	if err != nil {
 		log.Fatalf("Could not connect to ServerB: %v", err)
 	}
+	defer c2.Close()
 
 	// Do some quick RTT calculations
 	log.Println("==============================")
@@ -184,7 +191,7 @@ func main() {
 	log.Printf("Message Payload: %v\n", byteSize(MsgSize))
 	log.Printf("Target Duration: %v\n", TestDuration)
 	log.Printf("Target Msgs/Sec: %v\n", TargetPubRate)
-	log.Printf("Target Band/Sec: %v\n", byteSize(TargetPubRate*MsgSize*2))
+	log.Printf("Target Band/Sec: %v\n", bps(TargetPubRate*MsgSize*2))
 	log.Println("==============================")
 
 	// Random payload
@@ -195,22 +202,23 @@ func main() {
 	delay := time.Second / time.Duration(TargetPubRate)
 	pubStart := time.Now()
 
-	// Throttle logic, crude I know, but works better then time.Ticker.
-	adjustAndSleep := func(count int) {
-		r := rps(count, time.Since(pubStart))
-		adj := delay / 20 // 5%
-		if adj == 0 {
-			adj = 1 // 1ns min
-		}
+	// Throttle logic, crude I know, but works better then time.Ticker or
+	// golang.org/x/time/rate.
+
+	adjustAndSleep := func(now time.Time, count int) {
+		r := rps(count, now.Sub(pubStart))
+		adj := delay/20 + time.Nanosecond // 5%
 		if r < TargetPubRate {
 			delay -= adj
+			if delay < 0 {
+				delay = 0
+			}
 		} else if r > TargetPubRate {
 			delay += adj
 		}
-		if delay < 0 {
-			delay = 0
+		if delay > 0 {
+			time.Sleep(delay)
 		}
-		time.Sleep(delay)
 	}
 
 	// Now publish
@@ -219,7 +227,7 @@ func main() {
 		// Place the send time in the front of the payload.
 		binary.LittleEndian.PutUint64(data[0:], uint64(now.UnixNano()))
 		c1.Publish(subject, data)
-		adjustAndSleep(i + 1)
+		adjustAndSleep(now, i+1)
 	}
 	pubDur := time.Since(pubStart)
 	wg.Wait()
@@ -254,13 +262,13 @@ func main() {
 	log.Println("==============================")
 
 	if HistFile != "" {
-		pctls := histwriter.Percentiles{10, 25, 50, 75, 90, 99, 99.9, 99.99, 99.999, 99.9999, 99.99999, 100.0}
-		histwriter.WriteDistributionFile(h, pctls, 1.0/1000000.0, HistFile+".histogram")
+		pctls := hw.Percentiles{10, 25, 50, 75, 90, 99, 99.9, 99.99, 99.999, 99.9999, 99.99999, 100.0}
+		hw.WriteDistributionFile(h, pctls, 1.0/1000000.0, HistFile+".histogram")
 	}
 
 	// Print results
 	log.Printf("Actual Msgs/Sec: %d\n", rps(NumPubs, pubDur))
-	log.Printf("Actual Band/Sec: %v\n", byteSize(rps(NumPubs, pubDur)*MsgSize*2))
+	log.Printf("Actual Band/Sec: %v\n", bps(rps(NumPubs, pubDur)*MsgSize*2))
 	log.Printf("Minimum Latency: %v", fmtDur(durations[0]))
 	log.Printf("Median Latency : %v", fmtDur(getMedian(durations)))
 	log.Printf("Maximum Latency: %v", fmtDur(durations[len(durations)-1]))
@@ -279,6 +287,23 @@ func rps(count int, elapsed time.Duration) int {
 func byteSize(n int) string {
 	sizes := []string{"B", "K", "M", "G", "T"}
 	base := float64(1024)
+	if n < 10 {
+		return fmt.Sprintf("%d%s", n, sizes[0])
+	}
+	e := math.Floor(logn(float64(n), base))
+	suffix := sizes[int(e)]
+	val := math.Floor(float64(n)/math.Pow(base, e)*10+0.5) / 10
+	f := "%.0f%s"
+	if val < 10 {
+		f = "%.1f%s"
+	}
+	return fmt.Sprintf(f, val, suffix)
+}
+
+func bps(n int) string {
+	sizes := []string{"Bps", "Kbps", "Mbps", "Gbps", "Tbps"}
+	base := float64(1024)
+	n *= 8
 	if n < 10 {
 		return fmt.Sprintf("%d%s", n, sizes[0])
 	}
